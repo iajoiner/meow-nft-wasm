@@ -1,5 +1,6 @@
 use cosmwasm_std::{
-    entry_point, to_binary, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response, StdResult,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Response,
+    StdResult,
 };
 
 #[entry_point]
@@ -25,5 +26,5 @@ pub fn query(_deps: Deps, _env: Env, _msg: Empty) -> StdResult<Binary> {
         message: "Baruch Hashem".to_owned(),
     };
 
-    to_binary(&resp)
+    to_json_binary(&resp)
 }
