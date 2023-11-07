@@ -1,0 +1,110 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# workspace wide tests
+name: rust
+
+concurrency:
+  group: ${{ github.repository }}-${{ github.head_ref || github.sha }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+# trigger for all PRs and changes to main
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/**.rs'
+      - '**/Cargo.toml'
+  pull_request:
+    paths:
+      - '**/**.rs'
+      - '**/Cargo.toml'
+
+jobs:
+  # Check workspace wide compile and test with default features for
+  # mac, windows and ubuntu
+  windows-macos-and-ubuntu:
+    name: Test on ${{ matrix.os }} Rust ${{ matrix.rust }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        rust: [stable, beta, nightly]
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: Run tests
+        shell: bash
+        working-directory: ./rust
+        run: |
+          # do not produce debug symbols to keep memory usage down
+          export RUSTFLAGS="-C debuginfo=0"
+          cargo test
+
+  # Run cargo fmt for all crates
+  rust-lint:
+    name: Lint (cargo fmt)
+    runs-on: ubuntu-latest
+    container:
+      image: amd64/rust
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-builder
+      - name: Setup rustfmt
+        run: rustup component add rustfmt
+      - name: Run
+        working-directory: ./rust
+        run: cargo fmt --all -- --check
+  
+  # Run cargo tomlfmt for all crates
+  cargo-toml-lint:
+    name: Lint (cargo tomlfmt)
+    runs-on: ubuntu-latest
+    container:
+      image: amd64/rust
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-builder
+      - name: Setup tomlfmt
+        run: cargo install cargo-tomlfmt
+      - name: Run
+        working-directory: ./rust
+        run: find . -mindepth 2 -name 'Cargo.toml' -exec cargo tomlfmt -k -p {} \;
+
+  # Run cargo clippy for all crates
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    container:
+      image: amd64/rust
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-builder
+      - name: Setup tomlfmt
+        run: rustup component add clippy
+      - name: Run
+        working-directory: ./rust
+        run: cargo clippy --all-targets --workspace -- -D warnings
